@@ -26,10 +26,14 @@ def main():
         if st.sidebar.button("Home"):
             st.session_state.page = 'homepage'
 
+        if st.sidebar.button("Profile"):  # New Profile button
+            st.session_state.page = 'user_profile'
+            st.session_state.viewing_username = st.session_state.username  # Set viewing username to the logged-in user
+
         if st.sidebar.button("Logout", key="logout_button"):
             st.session_state.logged_in = False
             st.session_state.username = None
-            st.session_state.logged_in_username = None
+            st.session_state.viewing_username = None
             st.session_state.page = 'homepage'
             st.rerun()
 

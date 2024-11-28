@@ -29,8 +29,9 @@ def show_login():
             st.error("Please fill in all fields.")
             return False  # Indicate login was unsuccessful
 
-        # Unpack the three values returned by connect_db
-        db, recipes_collection, users_collection = connect_db()
+        # Connect to the database and get collections
+        db_collections = connect_db()
+        users_collection = db_collections["users"]  # Access the users collection from the returned dictionary
 
         # Query the MongoDB collection 'users' to find the user by username
         user = users_collection.find_one({"username": username})
