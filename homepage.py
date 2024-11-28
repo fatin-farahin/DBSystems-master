@@ -128,9 +128,27 @@ def display_rating(recipe_rating):
     # Ensure the rating is within the 0-5 range
     recipe_rating = max(0, min(recipe_rating, 5))
     
-    full_stars = "★" * int(recipe_rating)
-    empty_stars = "☆" * (5 - int(recipe_rating))  # 5 is the max number of stars
+    full_stars = "★" * int(recipe_rating)  # Unicode star for filled stars
+    empty_stars = "☆" * (5 - int(recipe_rating))  # Unicode star for empty stars
     return full_stars + empty_stars
+
+def add_to_favorites(user_id, recipe_id):
+    db = connect_db()
+    favorites_collection = db['favorites']
+    
+    # Add the favorite to the favorites collection
+    favorites_collection.insert_one({"user_id": user_id, "recipe_id": recipe_id})
+    st.success("Recipe added to favorites!")
+    st.rerun()  # Refresh the page after the action
+
+def remove_from_favorites(user_id, recipe_id):
+    db = connect_db()
+    favorites_collection = db['favorites']
+    
+    # Remove the favorite from the favorites collection
+    favorites_collection.delete_one({"user_id": user_id, "recipe_id": recipe_id})
+    st.success("Recipe removed from favorites!")
+    st.rerun()  # Refresh the page after the action
 
 def show_homepage():
     # Connect to the database
@@ -170,25 +188,43 @@ def show_homepage():
 
     # Ensure 'user_id' in recipes is treated as string
     recipes['user_id'] = recipes['user_id'].apply(str)
-
+ 
     # Now map user_id in recipes to user_dict
-    recipes['username'] = recipes['user_id'].apply(lambda user_id: user_dict.get(user_id, "Unknown"))
+    recipes['username'] = recipes['user_id'].apply(lambda user_id: user_dict.get(str(user_id), 'Unknown'))
 
     # Pass user_dict to recipe_details.py when navigating:
     st.session_state.user_dict = user_dict
 
-    # Check the type of user_id in the recipes collection
-    sample_recipe = recipes_collection.find_one()
-    print(type(sample_recipe['user_id']))
+    # Get the logged-in user's username from the session
+    logged_in_username = st.session_state.get("username", None)
+
+    if logged_in_username:
+        # Fetch the logged-in user's data
+        logged_in_user = users_collection.find_one({"username": logged_in_username})
+        favorite_recipe_ids = logged_in_user.get('favorite_recipes', [])
 
     st.title("Welcome to Bitezy!")
 
-    # Search bar and filters
+    # Search bar
     search_query = st.text_input("Search for recipes by title, description, or username:")
-    rating_filter = st.selectbox("Minimum Rating", options=rating_options, index=0)  # "All" is the default
-    cuisine_filter = st.selectbox("Cuisine", options=cuisines, index=0)  # Dynamic cuisine filter
-    dietary_filter = st.selectbox("Dietary Preferences", options=dietary, index=0)  # Dynamic dietary filter
-    cook_time_filter = st.slider("Maximum Cook Time (minutes)", min_value=0, max_value=120, step=5, value=120)
+
+    # First row for filters: Minimum Rating, Cuisine, Dietary Preferences
+    col1, col2, col3 = st.columns([1, 1, 1])  # Adjust column widths
+
+    with col1:
+        rating_filter = st.selectbox("Minimum Rating", options=rating_options, index=0)  # Dropdown for rating
+
+    with col2:
+        cuisine_filter = st.selectbox("Cuisine", options=cuisines, index=0)  # Dropdown for cuisine
+
+    with col3:
+        dietary_filter = st.selectbox("Dietary Preferences", options=dietary, index=0)  # Dropdown for dietary preferences
+
+    # Second row for the Cook Time slider
+    col4 = st.columns([1])[0]  # Single column for the slider
+
+    with col4:
+        cook_time_filter = st.slider("Cook Time (mins)", min_value=0, max_value=120, step=5, value=120)  # Slider for cook time
 
     # Apply search filter
     if search_query:
@@ -237,10 +273,28 @@ def show_homepage():
                 # Display recipe information
                 st.write(f"**Description:** {row['description']}")
                 # Create a clickable button for username
-                if st.button(f"**Submitted by:** {username}", key=f"profile_button_{row['user_id']}"):
+                if st.button(f"**Submitted by:** {username}", key=f"profile_button_{row['user_id']}_{row['recipe_id']}"):
                     # Navigate to the user profile
                     st.session_state.page = 'user_profile'  # Set the page to user_profile
                     st.session_state.viewing_username = username  # Track the user being viewed
                     st.rerun()
                 st.write(f"**Rating:** {rating_display}")
+
+                # Show Favorite/Unfavorite buttons if logged-in user is viewing their homepage
+                if logged_in_username:
+                    recipe_id = str(row['recipe_id'])  # Ensure recipe_id is a string
+                    if recipe_id in favorite_recipe_ids:
+                        if st.button(f"💔 Unfavorite", key=f"unfavorite_{row['recipe_id']}"):
+                            remove_from_favorites(logged_in_user['_id'], row['recipe_id'])
+                            # Update favorite_recipe_ids after removing the favorite
+                            favorite_recipe_ids.remove(recipe_id)
+                            st.session_state.favorite_recipe_ids = favorite_recipe_ids  # Update session state
+                            st.rerun()
+                    else:
+                        if st.button(f"❤️ Favorite", key=f"favorite_{row['recipe_id']}"):
+                            add_to_favorites(logged_in_user['_id'], row['recipe_id'])
+                            # Update favorite_recipe_ids after adding the favorite
+                            favorite_recipe_ids.append(recipe_id)
+                            st.session_state.favorite_recipe_ids = favorite_recipe_ids  # Update session state
+                            st.rerun()
                 st.write("---")

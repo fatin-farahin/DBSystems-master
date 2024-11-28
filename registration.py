@@ -24,8 +24,9 @@ def show_registration():
     """Displays the registration page."""
     st.title("Register")
 
-    # Unpack the three values returned by connect_db
-    db, recipes_collection, users_collection = connect_db()
+    # Connect to the database and get collections
+    db_collections = connect_db()
+    users_collection = db_collections["users"]  # Access the users collection from the returned dictionary
 
     # Initialize session state for error messages
     if 'errors' not in st.session_state:

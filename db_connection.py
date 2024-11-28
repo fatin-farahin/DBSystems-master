@@ -15,6 +15,7 @@ def connect_db():
         "recipe_info": db['recipe_info'],
         "recipe_ratings": db['recipe_ratings'],
         "cuisines": db['cuisines'],
-        "dietary": db['dietary']
+        "dietary": db['dietary'],
+        "favorites": db['favorites']
     }
     return collections
