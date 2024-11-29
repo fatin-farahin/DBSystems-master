@@ -5,7 +5,8 @@ from login import show_login  # Import the show_login function
 from homepage import show_homepage  # Import the homepage display function
 from registration import show_registration  # Import the registration function
 from recipe_details import recipe_details  # Import recipe_details function
-from user_profile import show_user_profile, show_edit_recipe_form  # Import user profile display function
+from user_profile import show_user_profile # Import user profile display function
+from fetch_recipe import show_edit_recipe_form,  show_edit_recipe  # Import edit recipe form function
 
 def main():
     # Set up the session state for page navigation and user details
@@ -14,6 +15,12 @@ def main():
         st.session_state.page = 'homepage'  # Default page is homepage
         st.session_state.user_id = None  # Initialize user_id
         st.session_state.username = None  # Initialize username
+
+    # Initialize session states for recipe management
+    if 'selected_recipe' not in st.session_state:
+        st.session_state.selected_recipe = None  # Default to no selected recipe
+    if 'show_recipe_form' not in st.session_state:
+        st.session_state.show_recipe_form = False  # Default to hiding the recipe form
 
     # Sidebar for navigation
     st.sidebar.title("Navigation")
@@ -62,10 +69,10 @@ def main():
     elif st.session_state.page == 'recipe_details':
         recipe_details()  # Call the recipe details function
     elif st.session_state.page == 'edit_recipe':
-        if 'selected_recipe' in st.session_state and st.session_state.selected_recipe is not None:
+        if st.session_state.selected_recipe is not None:
             show_edit_recipe_form(st.session_state.selected_recipe)
         else:
-            st.error("No recipe selected for editing.")
+            st.session_state.selected_recipe = None  # Reset the selected recipe
     elif st.session_state.page == 'user_profile':
         # Check if the user is logged in
         if st.session_state.logged_in:
@@ -76,13 +83,6 @@ def main():
             st.sidebar.text("Viewing profile as guest")
             if st.session_state.viewing_username:
                 show_user_profile(st.session_state.viewing_username)  # Show profile as a guest
-
-
-    # Optional: Consider adding a redirect after profile view
-    if st.session_state.page == 'user_profile' and st.sidebar.button("Back to Home"):
-        st.session_state.page = 'homepage'
-        st.rerun()  # Rerun to go back to the homepage
-
 
 if __name__ == "__main__":
     main()

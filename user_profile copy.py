@@ -3,9 +3,6 @@ import base64
 import os
 from db_connection import connect_db
 from homepage import display_rating, remove_from_favorites
-from fetch_profile import update_user_profile, display_profile_picture
-from fetch_recipe import show_edit_recipe, show_add_recipe, fetch_all_dietary_preferences, fetch_dietary_name, fetch_user_recipes
-from favorites import show_favorites
 
 # Fetch User Profile Data
 def fetch_user_profile(username):
@@ -33,7 +30,7 @@ def show_user_profile(username):
 
         # Allow editing if the logged-in user is viewing their own profile
         if logged_in_username == profile_username:
-            section = st.sidebar.selectbox("Choose an option", ["View Profile", "Update Profile", "Edit Recipes", "Add Recipes", "Favorites"])
+            section = st.sidebar.selectbox("Choose an option", ["View Profile", "Update Profile", "Edit Recipes", "Favorites"])
 
             if section == 'Update Profile':
                 st.subheader("Edit Your Profile")
@@ -84,10 +81,90 @@ def show_user_profile(username):
                         st.error(result)
 
             elif section == 'Edit Recipes':
-                show_edit_recipe()
+                db = connect_db()
+                dietary_collection = db["dietary"]  # Collection for dietary preferences
+                cuisines_collection = db["cuisines"]  # Collection for cuisines
+                
+                st.subheader("Edit Your Recipes")
+                recipes = fetch_user_recipes(logged_in_username)  # Fetch user's recipes from database
 
-            elif section == 'Add Recipes':
-                show_add_recipe()
+                if recipes:
+                    # Create a dropdown to select a recipe
+                    recipe_titles = [recipe['title'] for recipe in recipes]
+                    selected_recipe_title = st.selectbox("Select a recipe to edit", recipe_titles)
+
+                    # Find the selected recipe from the list
+                    selected_recipe = next(recipe for recipe in recipes if recipe['title'] == selected_recipe_title)
+
+                    # Show the recipe form if a recipe is selected
+                    if selected_recipe:
+                        if st.button(f"Edit {selected_recipe['title']}"):
+                            st.session_state.selected_recipe = selected_recipe['recipe_id']  # Store the recipe ID in session state
+                            st.session_state.page = 'edit_recipe'  # Navigate to edit_recipe page
+                            st.rerun()
+                else:
+                    st.write("No recipes found to edit.")
+
+                # Recipe form for adding a new recipe
+                add_recipe_button = st.button("Add Recipe", key="add_recipe_button")
+                if add_recipe_button:
+                    st.session_state.show_recipe_form = True
+
+                if st.session_state.get('show_recipe_form', False):
+                    # Define recipe fields
+                    new_recipe_title = st.text_input("Recipe Title", key="new_recipe_title")
+                    new_recipe_description = st.text_area("Recipe Description", key="new_recipe_description")
+                    new_cook_time = st.number_input("Cook Time (minutes)", min_value=1, key="new_cook_time")
+                    new_servings = st.number_input("Servings", min_value=1, key="new_servings")
+                    new_ingredients = st.text_area("Ingredients (one per line)", key="new_ingredients")
+                    new_instructions = st.text_area("Instructions", key="new_instructions")
+
+                    # Fetch dietary options from MongoDB
+                    dietary_options = dietary_collection.find()  # Fetch dietary preferences
+                    dietary_dict = {str(diet['dietary_id']): diet['name'] for diet in dietary_options}
+
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        new_dietary = st.selectbox("Dietary Preferences", list(dietary_dict.values()), key="new_dietary")
+
+                    # Fetch cuisine options from MongoDB
+                    cuisine_options = cuisines_collection.find()  # Fetch cuisine options
+                    cuisine_dict = {str(cuisine['cuisine_id']): cuisine['name'] for cuisine in cuisine_options}
+
+                    with col2:
+                        new_cuisine = st.selectbox("Cuisine Type", list(cuisine_dict.values()), key="new_cuisine")
+
+                    # Image upload
+                    uploaded_image = st.file_uploader("Upload Recipe Image", type=["jpeg", "jpg", "png"], key="recipe_image")
+                    if uploaded_image is not None:
+                        image_file_name = f"{logged_in_username}_{new_recipe_title}_{uploaded_image.name}"
+                        image_file_path = f"uploads/recipes/{image_file_name}"
+
+                        with open(image_file_path, "wb") as f:
+                            f.write(uploaded_image.getbuffer())
+
+                        st.success(f"Image '{uploaded_image.name}' uploaded successfully.")
+
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("Submit Recipe", key="submit_recipe_button"):
+                            message = save_recipe(
+                                new_recipe_title,
+                                new_recipe_description,
+                                new_cook_time,
+                                new_servings,
+                                new_ingredients,
+                                new_instructions,
+                                logged_in_username,
+                                image_file_name,
+                                new_dietary,
+                                new_cuisine
+                            )
+                            st.success(message)
+                            st.session_state.show_recipe_form = False
+                    with col2:
+                        if st.button("Cancel", key="cancel_recipe_button"):
+                            st.session_state.show_recipe_form = False
 
             elif section == 'Favorites':
                 st.subheader("Your Favorite Recipes")

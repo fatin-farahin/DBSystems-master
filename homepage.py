@@ -2,7 +2,6 @@
 
 import streamlit as st
 import pandas as pd
-from bson import ObjectId
 from db_connection import connect_db
 
 def fetch_recipes(
@@ -282,17 +281,17 @@ def show_homepage():
 
                 # Show Favorite/Unfavorite buttons if logged-in user is viewing their homepage
                 if logged_in_username:
-                    recipe_id = str(row['recipe_id'])  # Ensure recipe_id is a string
+                    recipe_id = row['recipe_id']
                     if recipe_id in favorite_recipe_ids:
-                        if st.button(f"💔 Unfavorite", key=f"unfavorite_{row['recipe_id']}"):
-                            remove_from_favorites(logged_in_user['_id'], row['recipe_id'])
+                        if st.button(f"💔 Unfavorite", key=f"unfavorite_{recipe_id}"):
+                            remove_from_favorites(logged_in_user['user_id'], recipe_id)
                             # Update favorite_recipe_ids after removing the favorite
                             favorite_recipe_ids.remove(recipe_id)
                             st.session_state.favorite_recipe_ids = favorite_recipe_ids  # Update session state
                             st.rerun()
                     else:
-                        if st.button(f"❤️ Favorite", key=f"favorite_{row['recipe_id']}"):
-                            add_to_favorites(logged_in_user['_id'], row['recipe_id'])
+                        if st.button(f"❤️ Favorite", key=f"favorite_{recipe_id}"):
+                            add_to_favorites(logged_in_user['user_id'], recipe_id)
                             # Update favorite_recipe_ids after adding the favorite
                             favorite_recipe_ids.append(recipe_id)
                             st.session_state.favorite_recipe_ids = favorite_recipe_ids  # Update session state
