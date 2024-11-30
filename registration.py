@@ -5,6 +5,7 @@ import hashlib
 import re
 from datetime import datetime
 from db_connection import connect_db
+from fetch_profile import save_profile_picture
 
 def hash_password(password):
     """Hashes a password for secure storage."""
@@ -28,84 +29,105 @@ def show_registration():
 
     # Connect to the database and get collections
     db_collections = connect_db()
-    users_collection = db_collections["users"]  # Access the users collection from the returned dictionary
+    users_collection = db_collections["users"]
+    dietary_collection = db_collections["dietary"]  # Access the dietary collection
+
+    # Fetch the dietary options from MongoDB and convert the cursor to a list
+    dietary_options = list(dietary_collection.find())  # Convert the cursor to a list
+
+    # Build the list of dietary names and the mapping of names to dietary_ids
+    dietary_names = [diet['name'] for diet in dietary_options]
+    dietary_ids = {diet['name']: diet['dietary_id'] for diet in dietary_options}  # Correct mapping
 
     # Initialize session state for error messages
     if 'errors' not in st.session_state:
         st.session_state.errors = {}
 
+    # Form fields
     username = st.text_input("Username", on_change=lambda: clear_error('username'))
     email = st.text_input("Email", on_change=lambda: clear_error('email'))
     password = st.text_input("Password", type="password", on_change=lambda: clear_error('password'))
     confirm_password = st.text_input("Confirm Password", type="password", on_change=lambda: clear_error('confirm_password'))
+    bio = st.text_input("Bio", on_change=lambda: clear_error('bio'))  # Bio input
+
+    # Profile Picture Upload
+    profile_pic = st.file_uploader("Upload Profile Picture", type=["jpg", "jpeg", "png"])  # Image upload
+
+    # Dietary Preference Dropdown
+    dietary_name = st.selectbox("Select Dietary Preference", dietary_names)  # Dropdown of dietary names
+    dietary_id = dietary_ids.get(dietary_name)  # Get dietary_id based on selected dietary_name
 
     # Function to clear specific error messages
     def clear_error(field):
         if field in st.session_state.errors:
             del st.session_state.errors[field]
 
-    # Validation checks for username
+    # Validation checks (similar to your previous code)
     if username:
-        if len(username) < 3:  # Check length first
+        if len(username) < 3:  # Check length
             st.session_state.errors['username'] = "Username must be at least 3 characters long."
         else:
-            # Check if the username is already taken in MongoDB
             existing_user = users_collection.find_one({"username": username})
             if existing_user:
-                st.session_state.errors['username'] = "Username already exists. Please choose a different username."
+                st.session_state.errors['username'] = "Username already exists."
 
-    # Validation checks for email
     if email:
-        if not is_valid_email(email):  # Check if email format is valid
-            st.session_state.errors['email'] = "Invalid email format. Please enter a valid email (e.g., user@gmail.com)."
+        if not is_valid_email(email):
+            st.session_state.errors['email'] = "Invalid email format."
         else:
-            # Check if the email is already taken in MongoDB
             existing_email = users_collection.find_one({"email": email})
             if existing_email:
-                st.session_state.errors['email'] = "Email is already taken. Please use a different email."
+                st.session_state.errors['email'] = "Email is already taken."
 
-    # Validation checks for password
     if password:
-        if not is_valid_password(password):  # Validate password criteria
-            st.session_state.errors['password'] = (
-                "Password must be at least 6 characters long, "
-                "contain at least one uppercase letter, one lowercase letter, and one digit."
-            )
+        if not is_valid_password(password):
+            st.session_state.errors['password'] = "Password must meet the criteria."
 
-    # Validation check for confirm password
-    if confirm_password:
-        if confirm_password != password:
-            st.session_state.errors['confirm_password'] = "Passwords do not match."
+    if confirm_password and confirm_password != password:
+        st.session_state.errors['confirm_password'] = "Passwords do not match."
 
-    # Display error messages below respective fields
+    # Display error messages
     for field, error_msg in st.session_state.errors.items():
         st.error(error_msg)
 
     if st.button("Register", key="register_submit"):
-        # Final checks before registration
         if not username or not email or not password or not confirm_password:
             st.error("Please fill in all fields.")
-            return False  # Indicate registration was unsuccessful
+            return False
 
-        # If all checks pass, register the user
+        # Handle profile_pic upload
+        if profile_pic:
+            profile_pic_url = save_profile_picture(username, profile_pic)  # Save the image file
+
+        # Retrieve and increment user_id
+        latest_user = users_collection.find().sort("user_id", -1).limit(1)
+        latest_user_id = latest_user[0]["user_id"] if latest_user else 0
+        user_id = latest_user_id + 1
+
+        # Register the new user
         hashed_password = hash_password(password)
         date_joined = datetime.now()
 
-        # Store the new user in MongoDB
         new_user = {
+            "user_id": user_id,
             "username": username,
             "email": email,
             "password_hashed": hashed_password,
-            "date_joined": date_joined
+            "bio": bio,
+            "profile_pic": profile_pic_url if profile_pic else "",  # Store image URL or path
+            "date_joined": date_joined,
+            "dietary_id": dietary_id  # Save the dietary_id to MongoDB 
         }
+
+        # Insert the new user into the users collection
         users_collection.insert_one(new_user)
 
-        st.success("Registration successful! You can now log in.")
-        
-        # Set session state to redirect to the login page
-        st.session_state.page = 'login'  # This will redirect to the login page
-        st.rerun()  # Trigger a rerun to navigate to the login page
+        st.success("Registration successful!")
 
-        return True  # Indicate successful registration
+        # Redirect to login page (optional)
+        st.session_state.page = 'login'
+        st.rerun()
 
-    return False  # Indicate registration was unsuccessful
+        return True
+
+    return False

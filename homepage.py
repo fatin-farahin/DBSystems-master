@@ -3,6 +3,8 @@
 import streamlit as st
 import pandas as pd
 from db_connection import connect_db
+from recipe_rating import rate_recipe
+from favorites import display_rating, add_to_favorites, remove_from_favorites
 
 def fetch_recipes(
     search_query: str = None,
@@ -84,7 +86,7 @@ def fetch_recipes(
         },
         {
             "$group": {
-                "_id": "$_id",
+                "_id": "$recipe_id",
                 "title": { "$first": "$title" },
                 "description": { "$first": "$description" },
                 "user_id": { "$first": "$user_id" },
@@ -132,43 +134,12 @@ def fetch_recipes(
 
     results = list(recipes_collection.aggregate(pipeline))
     recipes_df = pd.DataFrame(results)
-    st.write(recipes_df[['user_id', 'username']].head())
 
     if not recipes_df.empty:
         recipes_df.rename(columns={"_id": "recipe_id"}, inplace=True)
         recipes_df.sort_values(by="title", inplace=True)  # Sort by title for consistent order
 
     return recipes_df
-
-def display_rating(recipe_rating):
-    """Display the rating with stars or 'No ratings yet' if no rating exists."""
-    if pd.isna(recipe_rating) or recipe_rating == 0:
-        return "No ratings yet"
-    
-    # Ensure the rating is within the 0-5 range
-    recipe_rating = max(0, min(recipe_rating, 5))
-    
-    full_stars = "★" * int(recipe_rating)  # Unicode star for filled stars
-    empty_stars = "☆" * (5 - int(recipe_rating))  # Unicode star for empty stars
-    return full_stars + empty_stars
-
-def add_to_favorites(user_id, recipe_id):
-    db = connect_db()
-    favorites_collection = db['favorites']
-    
-    # Add the favorite to the favorites collection
-    favorites_collection.insert_one({"user_id": user_id, "recipe_id": recipe_id})
-    st.success("Recipe added to favorites!")
-    st.rerun()  # Refresh the page after the action
-
-def remove_from_favorites(user_id, recipe_id):
-    db = connect_db()
-    favorites_collection = db['favorites']
-    
-    # Remove the favorite from the favorites collection
-    favorites_collection.delete_one({"user_id": user_id, "recipe_id": recipe_id})
-    st.success("Recipe removed from favorites!")
-    st.rerun()  # Refresh the page after the action
 
 def show_homepage():
     # Connect to the database
@@ -206,9 +177,6 @@ def show_homepage():
     # Fetch users with the new integer user_id
     users = list(users_collection.find({}, {"user_id": 1, "username": 1}))
 
-    # Print out users to check their structure
-    st.write(users)  # For debugging purposes
-
     # Check each user and ensure 'user_id' exists before constructing the user_dict
     user_dict = {}
     for user in users:
@@ -217,17 +185,11 @@ def show_homepage():
         else:
             st.warning(f"Missing user_id or username for user: {user}")  # Debugging missing fields
 
-    # Check if the user_dict is correct
-    st.write(f"user_dict: {user_dict}")
-
-
     # Now map the 'user_id' in recipes (assuming it's an ObjectId) to the 'username' from user_dict
     recipes['username'] = recipes['user_id'].apply(lambda x: user_dict.get(str(x), 'Unknown'))
 
     # If there are any missing values in 'username', fill with 'Unknown'
     recipes['username'] = recipes['username'].fillna('Unknown')
-
-    st.write(recipes[['user_id', 'username']].head())
 
     # Pass user_dict to recipe_details.py when navigating:
     st.session_state.user_dict = user_dict
@@ -315,23 +277,46 @@ def show_homepage():
                     st.session_state.page = 'user_profile'  # Set the page to user_profile
                     st.session_state.viewing_username = username  # Track the user being viewed
                     st.rerun()
-                st.write(f"**Rating:** {rating_display}")
+                #st.write(f"**Rating:** {rating_display}")
+                
+                # Rating functionality
+                if logged_in_username:
+                    user_rating = st.slider(
+                        f"Rate {row['title']}:",
+                        min_value=1,
+                        max_value=5,
+                        step=1,
+                        key=f"rate_{row['recipe_id']}"
+                    )
+                    if st.button(f"Submit Rating", key=f"submit_rating_{row['recipe_id']}"):
+                        rate_recipe(logged_in_user['_id'], row['recipe_id'], user_rating)
 
                 # Show Favorite/Unfavorite buttons if logged-in user is viewing their homepage
                 if logged_in_username:
                     recipe_id = row['recipe_id']
-                    if recipe_id in favorite_recipe_ids:
+                    
+                    # Check if the recipe is already favorited
+                    is_favorited = recipe_id in st.session_state.favorite_recipe_ids
+                    
+                    if is_favorited:
+                        # If the recipe is favorited, show "Unfavorite" button
                         if st.button(f"💔 Unfavorite", key=f"unfavorite_{recipe_id}"):
-                            remove_from_favorites(logged_in_user['user_id'], recipe_id)
-                            # Update favorite_recipe_ids after removing the favorite
-                            favorite_recipe_ids.remove(recipe_id)
-                            st.session_state.favorite_recipe_ids = favorite_recipe_ids  # Update session state
-                            st.rerun()
+                            message = remove_from_favorites(logged_in_user['user_id'], recipe_id)
+                            st.session_state["success_message"] = message  # Store success message
+                            # Safely remove recipe_id if it exists in the list
+                            if recipe_id in st.session_state.favorite_recipe_ids:
+                                st.session_state.favorite_recipe_ids.remove(recipe_id)
+                            st.success(message)  # Show the success message
+                            st.session_state["success_message"] = None  # Reset message after showing it
+
                     else:
+                        # If the recipe is not favorited, show "Favorite" button
                         if st.button(f"❤️ Favorite", key=f"favorite_{recipe_id}"):
-                            add_to_favorites(logged_in_user['user_id'], recipe_id)
-                            # Update favorite_recipe_ids after adding the favorite
-                            favorite_recipe_ids.append(recipe_id)
-                            st.session_state.favorite_recipe_ids = favorite_recipe_ids  # Update session state
-                            st.rerun()
+                            message = add_to_favorites(logged_in_user['user_id'], recipe_id)
+                            st.session_state["success_message"] = message  # Store success message
+                            # Add recipe_id to the list of favorite_recipe_ids
+                            st.session_state.favorite_recipe_ids.append(recipe_id)
+                            st.success(message)  # Show the success message
+                            st.session_state["success_message"] = None  # Reset message after showing it
+                    
                 st.write("---")

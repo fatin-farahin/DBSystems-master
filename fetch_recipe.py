@@ -103,14 +103,14 @@ def show_add_recipe():
                     new_cuisine_id  # Pass the cuisine_id
                 )
                 st.success(message)
-                st.session_state.show_recipe_form = False
-                st.session_state.page = 'user_profile'  # Set the page to the user's profile page
+                st.session_state.show_recipe_form = False  # Hide the recipe form
+                st.session_state.page = "user_profile"  # Redirect to Select Recipe page
                 st.rerun()
 
         with col2:
             if st.button("Cancel", key="cancel_recipe_button"):
                 st.session_state.show_recipe_form = False  # Hide the form when cancel is clicked
-                st.session_state.page = 'user_profile'  # Redirect to the user profile page
+                st.session_state.page = "user_profile"  # Redirect to Select Recipe page
                 st.rerun()
 
 # Show Recipes
@@ -155,10 +155,10 @@ def show_edit_recipe_form(recipe_id):
         # Prepare lists for the selectbox options
         cuisine_names = [cuisine["name"] for cuisine in cuisines]
         dietary_names = [dietary["name"] for dietary in dietary_options]
-        
+
         # Get the current dietary and cuisine IDs from the recipe
-        current_dietary_id = recipe.get("dietary_id", None)  # "5"
-        current_cuisine_id = recipe.get("cuisine_id", None)  # "15"
+        current_dietary_id = recipe.get("dietary_id", None)
+        current_cuisine_id = recipe.get("cuisine_id", None)
 
         # Get the current dietary and cuisine names based on their IDs
         current_dietary_name = next(
@@ -204,7 +204,6 @@ def show_edit_recipe_form(recipe_id):
             new_cuisine_id = cuisines[0]["cuisine_id"] if cuisines else None
 
         # Upload recipe picture
-        st.markdown("### Recipe Picture")
         uploaded_image = st.file_uploader(
             "Upload a new picture for the recipe", type=["png", "jpg", "jpeg"]
         )
@@ -268,24 +267,35 @@ def show_edit_recipe_form(recipe_id):
 
         with col2:
             if st.button("Cancel", key="cancel_button"):
+                # Navigate to the page where the user can select a recipe
                 st.session_state.selected_recipe = None
-                st.session_state.page = "edit_recipe"  # Navigate back to profile
+                st.session_state.page = "select_recipe"  # Redirect to Select Recipe page
                 st.rerun()
 
         with col3:
+            # When Delete Recipe button is clicked
             if st.button("Delete Recipe", key="delete_button"):
                 # Show a warning prompt before deletion
                 st.warning("Are you sure you want to delete this recipe? This action cannot be undone.")
-                st.session_state.confirm_delete = False
+                st.session_state.confirm_delete = True  # Set confirmation to True after the warning
 
-            if st.session_state.get("confirm_delete", False):
-                # If confirmed, delete the recipe
-                delete_recipe(recipe_id, image_file_name=recipe.get("image_src"))
-                st.success("Recipe deleted successfully!")
-                st.session_state.selected_recipe = None
-                st.session_state.confirm_delete = True
-                st.session_state.page = "user_profile"
-                st.rerun()
+            # Show the "Confirm Delete" button only if confirm_delete is True
+            if st.session_state.confirm_delete:
+                if st.button("Confirm Delete", key="confirm_delete_button"):
+                    # If confirmed, delete the recipe
+                    delete_recipe(recipe_id=recipe["recipe_id"], image_file_name=recipe.get("image_src"))
+                    st.success("Recipe deleted successfully!")
+                    st.session_state.selected_recipe = None  # Reset selected recipe after deletion
+                    st.session_state.page = "select_recipe"  # Redirect to recipe selection page
+                    st.session_state.confirm_delete = False  # Reset confirmation state
+                    st.rerun()
+
+            # Cancel button logic (if you want to cancel the delete operation)
+            """ if st.session_state.confirm_delete and st.button("Cancel", key="cancel_delete_button"):
+                st.session_state.confirm_delete = False  # Reset confirm_delete to False
+                st.session_state.page = "select_recipe"  # Go back to the recipe selection page
+                st.rerun() """
+
     else:
         st.error("Recipe not found!")
 

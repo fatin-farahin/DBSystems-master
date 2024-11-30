@@ -1,3 +1,5 @@
+# app.py
+
 import streamlit as st
 
 # Import pages
@@ -6,7 +8,7 @@ from homepage import show_homepage  # Import the homepage display function
 from registration import show_registration  # Import the registration function
 from recipe_details import recipe_details  # Import recipe_details function
 from user_profile import show_user_profile # Import user profile display function
-from fetch_recipe import show_edit_recipe_form,  show_edit_recipe  # Import edit recipe form function
+from fetch_recipe import show_add_recipe, show_edit_recipe_form,  show_edit_recipe  # Import edit recipe form function
 
 def main():
     # Set up the session state for page navigation and user details
@@ -21,6 +23,15 @@ def main():
         st.session_state.selected_recipe = None  # Default to no selected recipe
     if 'show_recipe_form' not in st.session_state:
         st.session_state.show_recipe_form = False  # Default to hiding the recipe form
+    if 'confirm_delete' not in st.session_state:
+            st.session_state.confirm_delete = False  # Initialize delete confirmation state
+    if "favorite_recipe_ids" not in st.session_state:
+        st.session_state.favorite_recipe_ids = []
+
+    # Display success message if it exists in session state
+    if "success_message" in st.session_state and st.session_state["success_message"]:
+        st.success(st.session_state["success_message"])
+        st.session_state["success_message"] = None  # Clear the message after it's displayed
 
     # Sidebar for navigation
     st.sidebar.title("Navigation")
@@ -68,6 +79,10 @@ def main():
         show_registration()  # Display registration page
     elif st.session_state.page == 'recipe_details':
         recipe_details()  # Call the recipe details function
+    elif st.session_state.page == 'add_recipe':
+        show_add_recipe()
+    elif st.session_state.page == 'select_recipe':
+        show_edit_recipe()  # Display page where the user can select a recipe to edit
     elif st.session_state.page == 'edit_recipe':
         if st.session_state.selected_recipe is not None:
             show_edit_recipe_form(st.session_state.selected_recipe)

@@ -2,8 +2,8 @@
 
 import streamlit as st
 import os
-from bson import ObjectId
 from db_connection import connect_db
+from recipe_rating import rate_recipe
 
 # Fetch recipe details
 def fetch_recipe_details(recipe_id):
@@ -12,6 +12,9 @@ def fetch_recipe_details(recipe_id):
     recipe_info_collection = db["recipe_info"]
 
     try:
+        # Ensure recipe_id is an integer
+        recipe_id = int(recipe_id)
+        
         # Query for the recipe from the recipes collection
         recipe = recipes_collection.find_one({"recipe_id": recipe_id})
 
@@ -35,6 +38,7 @@ def fetch_recipe_details(recipe_id):
             recipe["description"],
             recipe["image_src"],
             user_name,
+            recipe["user_id"],
             recipe_info["cook_timeserving"],
             recipe_info["servings"],
             recipe_info["ingredients"],
@@ -47,12 +51,15 @@ def fetch_recipe_details(recipe_id):
 
 # Recipe details page
 def recipe_details():
+    db = connect_db()
+    recipes_collection = db["recipes"]
+
     if 'selected_recipe' in st.session_state:
         recipe_id = st.session_state.selected_recipe
         recipe = fetch_recipe_details(recipe_id)
 
         if recipe:
-            title, description, image_src, username, cook_time, servings, ingredients, instructions = recipe
+            title, description, image_src, username, recipe_creator_id, cook_time, servings, ingredients, instructions = recipe
 
             st.title(title)
 
@@ -93,6 +100,9 @@ def recipe_details():
             st.subheader("Instructions")
             format_instructions(instructions)
             st.write("")
+
+            # Add rating functionality
+            rate_recipe(recipe_id, recipe_creator_id)
 
         if st.button("Back to Recipe List"):
             st.session_state.page = 'homepage'

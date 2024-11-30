@@ -2,7 +2,7 @@ import streamlit as st
 import base64
 import os
 from db_connection import connect_db
-from homepage import display_rating, remove_from_favorites
+from homepage import display_rating
 from fetch_profile import update_user_profile, display_profile_picture
 from fetch_recipe import show_edit_recipe, show_add_recipe, fetch_all_dietary_preferences, fetch_dietary_name, fetch_user_recipes
 from favorites import show_favorites
@@ -57,29 +57,26 @@ def show_user_profile(username):
                 # Profile picture upload section (file upload widget)
                 new_profile_pic = st.file_uploader("Upload Profile Picture", type=["png", "jpg", "jpeg"])
 
-                # Check if a new profile picture is uploaded
                 if new_profile_pic:
-                    # Optionally display the uploaded image
-                    st.image(new_profile_pic, caption="Uploaded profile picture", use_column_width=True)
+                    st.image(new_profile_pic, caption="Uploaded profile picture", width=300)
 
                 if st.button("Save Changes"):
+                    # Now pass each field individually to the update function
                     result = update_user_profile(
-                        logged_in_username,  # Old username
+                        logged_in_username,  # Current username (for user identification)
                         new_username,        # New username
-                        new_email,
-                        new_bio,
-                        selected_dietary_id,
-                        new_profile_pic
+                        new_email,           # New email
+                        new_bio,             # New bio
+                        selected_dietary_id, # New dietary ID
+                        new_profile_pic      # New profile pic (optional)
                     )
-                    
+
                     if isinstance(result, dict) and result.get("status") == "success":
                         st.success("Profile updated successfully!")
-                        # Update session state with new username
-                        st.session_state["username"] = new_username
-                        logged_in_username = new_username  # Update logged-in username immediately
-                        # Refetch the user's profile to reflect updates
+                        st.session_state["username"] = new_username  # Update logged-in username
+                        logged_in_username = new_username
                         user = fetch_user_profile(logged_in_username)
-                        st.rerun()  # Reload the page with the new username
+                        st.rerun()
                     else:
                         st.error(result)
 
@@ -91,7 +88,7 @@ def show_user_profile(username):
 
             elif section == 'Favorites':
                 st.subheader("Your Favorite Recipes")
-                show_favorites(username)
+                show_favorites(user.get('user_id'))
 
             else:
                 # Default "View Profile" section

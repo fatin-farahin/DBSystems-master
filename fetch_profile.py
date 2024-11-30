@@ -1,4 +1,4 @@
-# user_profile.py
+# fetch_profile.py
 
 import streamlit as st
 import base64
@@ -29,9 +29,10 @@ def update_user_profile(username, new_username, new_email, new_bio, new_dietary_
 
     # Handle profile picture
     if new_profile_pic:
-        profile_pic_path = save_profile_picture(username, new_profile_pic)
-        if existing_user.get("profile_pic") != profile_pic_path:
-            update_fields["profile_pic"] = profile_pic_path
+        # Save the profile picture and get the filename (not the full path)
+        profile_pic_filename = save_profile_picture(new_profile_pic)
+        if existing_user.get("profile_pic") != profile_pic_filename:
+            update_fields["profile_pic"] = profile_pic_filename
 
     if not update_fields:
         return "No changes were made to the profile."
@@ -48,16 +49,19 @@ def update_user_profile(username, new_username, new_email, new_bio, new_dietary_
     else:
         return "Failed to update the profile. Please try again."
 
-def save_profile_picture(username, uploaded_file):
-    """
-    Save the uploaded profile picture to a directory or cloud storage.
-    Returns the file path or URL for storing in the database.
-    """
-    # Save locally (for demonstration purposes)
-    save_path = f"profile_pictures/{username}_{uploaded_file.name}"
-    with open(save_path, "wb") as f:
+def save_profile_picture(uploaded_file):
+    # Create a directory for the user if it doesn't exist
+    user_folder = "uploads/users"
+    if not os.path.exists(user_folder):
+        os.makedirs(user_folder)
+
+    # Save the file with a unique filename (you could use the uploaded_file.name or a unique identifier)
+    file_path = os.path.join(user_folder, uploaded_file.name)
+    with open(file_path, "wb") as f:
         f.write(uploaded_file.getbuffer())
-    return save_path
+    
+    # Return only the filename, not the full path
+    return uploaded_file.name
 
 # Display Profile Picture
 def display_profile_picture(profile_pic):
