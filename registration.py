@@ -1,3 +1,5 @@
+# registration.py
+
 import streamlit as st
 import hashlib
 import re

@@ -13,7 +13,7 @@ def fetch_recipe_details(recipe_id):
 
     try:
         # Query for the recipe from the recipes collection
-        recipe = recipes_collection.find_one({"_id": ObjectId(recipe_id)})
+        recipe = recipes_collection.find_one({"recipe_id": recipe_id})
 
         if not recipe:
             st.error("Recipe not found!")

@@ -11,8 +11,8 @@ def fetch_recipes(
     dietary_filter: str = None,
     cook_time_filter: int = None
 ) -> pd.DataFrame:
-    db_collections = connect_db()  # Assuming this function connects to the database
-    recipes_collection = db_collections["recipes"]
+    db = connect_db()  # Assuming this function connects to the database
+    recipes_collection = db["recipes"]
 
     pipeline = [
         {
@@ -37,7 +37,7 @@ def fetch_recipes(
         {
             "$unwind": {
                 "path": "$user_info",
-                "preserveNullAndEmptyArrays": True  # Ensure capitalization of `True`
+                "preserveNullAndEmptyArrays": True
             }
         },
         {
@@ -51,7 +51,7 @@ def fetch_recipes(
         {
             "$unwind": {
                 "path": "$recipe_info",
-                "preserveNullAndEmptyArrays": True  # Ensure capitalization of `True`
+                "preserveNullAndEmptyArrays": True
             }
         },
         {
@@ -65,7 +65,7 @@ def fetch_recipes(
         {
             "$unwind": {
                 "path": "$cuisine_info",
-                "preserveNullAndEmptyArrays": True  # Ensure capitalization of `True`
+                "preserveNullAndEmptyArrays": True
             }
         },
         {
@@ -79,7 +79,7 @@ def fetch_recipes(
         {
             "$unwind": {
                 "path": "$dietary_info",
-                "preserveNullAndEmptyArrays": True  # Ensure capitalization of `True`
+                "preserveNullAndEmptyArrays": True
             }
         },
         {
@@ -100,7 +100,27 @@ def fetch_recipes(
 
     # Apply the filters if set
     if search_query:
-        pipeline.insert(0, {"$match": {"$text": {"$search": search_query}}})
+        # Normalize the search query to lowercase and split it into terms
+        search_query_terms = search_query.lower().split()  # Split by space to get individual terms
+
+        # Use a regex match for each search term in title and description
+        regex_filters = [
+            {
+                "$match": {
+                    "$or": [
+                        {"title": {"$regex": term, "$options": "i"}}  # Case-insensitive search in title
+                        for term in search_query_terms
+                    ] + [
+                        {"description": {"$regex": term, "$options": "i"}}  # Case-insensitive search in description
+                        for term in search_query_terms
+                    ]
+                }
+            }
+        ]
+        
+        # Insert the regex filters into the pipeline
+        pipeline.insert(0, *regex_filters)
+
     if rating_filter:
         pipeline.append({"$match": {"ratings": {"$gte": rating_filter}}})
     if cuisine_filter and cuisine_filter != "All":
@@ -112,6 +132,7 @@ def fetch_recipes(
 
     results = list(recipes_collection.aggregate(pipeline))
     recipes_df = pd.DataFrame(results)
+    st.write(recipes_df[['user_id', 'username']].head())
 
     if not recipes_df.empty:
         recipes_df.rename(columns={"_id": "recipe_id"}, inplace=True)
@@ -151,13 +172,13 @@ def remove_from_favorites(user_id, recipe_id):
 
 def show_homepage():
     # Connect to the database
-    db_collections = connect_db()
+    db = connect_db()
 
     # Access collections from the dictionary
-    recipes_collection = db_collections["recipes"]
-    users_collection = db_collections["users"]
-    cuisines_collection = db_collections["cuisines"]
-    dietary_collection = db_collections["dietary"]
+    recipes_collection = db["recipes"]
+    users_collection = db["users"]
+    cuisines_collection = db["cuisines"]
+    dietary_collection = db["dietary"]
 
     # Fetch the data from MongoDB collections
     users = pd.DataFrame(list(users_collection.find()))  # Fetch users collection
@@ -182,14 +203,31 @@ def show_homepage():
     recipes['servings'] = recipes['servings'].fillna('Unknown')  # Default to 'Unknown' if servings are missing
     recipes['cook_time'] = recipes['cook_time'].fillna(0)  # Default to 0 if cook_time is missing
 
-    # Create a dictionary mapping user_id (converted to string) to username
-    user_dict = {str(user['user_id']): user['username'] for user in users}
+    # Fetch users with the new integer user_id
+    users = list(users_collection.find({}, {"user_id": 1, "username": 1}))
 
-    # Ensure 'user_id' in recipes is treated as string
-    recipes['user_id'] = recipes['user_id'].apply(str)
- 
-    # Now map user_id in recipes to user_dict
-    recipes['username'] = recipes['user_id'].apply(lambda user_id: user_dict.get(str(user_id), 'Unknown'))
+    # Print out users to check their structure
+    st.write(users)  # For debugging purposes
+
+    # Check each user and ensure 'user_id' exists before constructing the user_dict
+    user_dict = {}
+    for user in users:
+        if 'user_id' in user and 'username' in user:
+            user_dict[str(user['user_id'])] = user['username']
+        else:
+            st.warning(f"Missing user_id or username for user: {user}")  # Debugging missing fields
+
+    # Check if the user_dict is correct
+    st.write(f"user_dict: {user_dict}")
+
+
+    # Now map the 'user_id' in recipes (assuming it's an ObjectId) to the 'username' from user_dict
+    recipes['username'] = recipes['user_id'].apply(lambda x: user_dict.get(str(x), 'Unknown'))
+
+    # If there are any missing values in 'username', fill with 'Unknown'
+    recipes['username'] = recipes['username'].fillna('Unknown')
+
+    st.write(recipes[['user_id', 'username']].head())
 
     # Pass user_dict to recipe_details.py when navigating:
     st.session_state.user_dict = user_dict
