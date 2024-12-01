@@ -76,7 +76,6 @@ def show_user_profile(username):
                         st.session_state["username"] = new_username  # Update logged-in username
                         logged_in_username = new_username
                         user = fetch_user_profile(logged_in_username)
-                        st.rerun()
                     else:
                         st.error(result)
 

@@ -73,6 +73,9 @@ def main():
     elif st.session_state.page == 'login':
         if show_login():  # Call the login function and check for successful login
             st.session_state.logged_in = True  # Set logged_in to True on successful login
+            st.session_state.user_id = st.session_state["user_id"]  # Set user_id after login
+            st.session_state.username = st.session_state["username"]  # Optional: Set username if needed
+            st.session_state.page = 'homepage'
             # Assume that the show_login function sets st.session_state.user_id
             st.session_state.page = 'homepage'  # Redirect to homepage
     elif st.session_state.page == 'registration':

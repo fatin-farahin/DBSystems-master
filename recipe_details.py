@@ -38,7 +38,6 @@ def fetch_recipe_details(recipe_id):
             recipe["description"],
             recipe["image_src"],
             user_name,
-            recipe["user_id"],
             recipe_info["cook_timeserving"],
             recipe_info["servings"],
             recipe_info["ingredients"],
@@ -59,50 +58,35 @@ def recipe_details():
         recipe = fetch_recipe_details(recipe_id)
 
         if recipe:
-            title, description, image_src, username, recipe_creator_id, cook_time, servings, ingredients, instructions = recipe
+            title, description, image_src, username, cook_time, servings, ingredients, instructions = recipe
 
+            # Display recipe details
             st.title(title)
-
-            image_path = f"uploads/recipes/{image_src}"
-
-            st.markdown("""
-                <style>
-                .recipe-image img {
-                    max-width: 400px;
-                    width: 100%;
-                    height: auto;
-                }
-                </style>
-            """, unsafe_allow_html=True)
-
-            # Display the recipe image
-            if os.path.exists(image_path):
-                st.image(image_path, width=300)
-            else:
-                st.write("Image not found.")
-
+            st.image(f"uploads/recipes/{image_src}", width=300)
             st.write(f"**Description:** {description}")
             st.write(f"**Cook Time:** {cook_time} minutes")
             st.write(f"**Servings:** {servings}")
 
-            # Display the username as a clickable link
-            if st.button(f"Submitted by: {username}", key=f"user_{username}_{recipe_id}"):
-                st.session_state.page = 'user_profile'
-                st.session_state.viewing_username = username
-                st.rerun()
-
-            st.write("")
-            st.markdown("<hr style='margin: 5px 0;'>", unsafe_allow_html=True)
-            
+            # Display ingredients and instructions
             st.subheader("Ingredients")
             format_ingredients(ingredients)
-
             st.subheader("Instructions")
             format_instructions(instructions)
-            st.write("")
 
-            # Add rating functionality
-            rate_recipe(recipe_id, recipe_creator_id)
+            # Check if the user is logged in
+            logged_in_user = st.session_state.get('logged_in_user')
+
+            if logged_in_user:
+                logged_in_user_id = logged_in_user["user_id"]
+                recipe_owner_id = recipe[3]  # recipe_owner is the 4th item in the recipe tuple
+
+                # If logged-in user is the owner, don't allow rating
+                if logged_in_user_id == recipe_owner_id:
+                    st.info("You cannot rate your own recipe.")
+                else:
+                    rate_recipe(recipe_id)  # Allow rating for non-owners
+            else:
+                rate_recipe(recipe_id)  # Allow rating for guest users
 
         if st.button("Back to Recipe List"):
             st.session_state.page = 'homepage'

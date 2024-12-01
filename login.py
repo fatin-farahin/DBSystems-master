@@ -40,7 +40,11 @@ def show_login():
             # Check password hash
             if check_password_hash(user['password_hashed'], password):  # Assuming password is stored as 'password_hashed'
                 st.session_state["username"] = username  # Store username in session state
-                st.session_state["user_id"] = str(user["_id"])  # Store user_id in session state (convert to string)
+                
+                # Fetch user_id from the correct field in the user document
+                user_id = user.get("user_id", str(user["_id"]))  # Use custom user_id if available, otherwise fallback to _id
+                st.session_state["user_id"] = user_id  # Store user_id in session state (convert to string if necessary)
+                
                 st.session_state['logged_in'] = True  # Track login status
                 st.success("Login successful! Redirecting to the homepage...")
                 st.session_state.page = 'homepage'  # Redirect to homepage

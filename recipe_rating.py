@@ -16,58 +16,83 @@ def display_rating(recipe_rating):
     empty_stars = "☆" * (5 - int(recipe_rating))  # Unicode star for empty stars
     return full_stars + empty_stars
 
-def rate_recipe(recipe_id, recipe_creator_id):
+def rate_recipe(recipe_id):
     db = connect_db()
     ratings_collection = db["recipe_ratings"]
     recipes_collection = db["recipes"]
+    users_collection = db["users"]
 
-    try:
-        # Check if the user is logged in
-        user_id = st.session_state.get("logged_in_user", {}).get("user_id", None)
+    # Ensure recipe_id is stored as an integer
+    recipe_id = int(recipe_id)
 
-        # Prevent logged-in users from rating their own recipes
-        if user_id and user_id == recipe_creator_id:
-            st.info("You cannot rate your own recipe.")
-            return
+    # Get logged-in user (if any)
+    logged_in_user = st.session_state.get('logged_in')
+    st.write(f"Logged-in user: {logged_in_user}")  # Debug: check if the user is logged in
 
-        # Show rating input (1 to 5 stars)
-        st.write("Rate this recipe:")
-        rating = st.slider("Your Rating", min_value=1, max_value=5, step=1)
+    if logged_in_user:
+        user_id = st.session_state.get('user_id')  # Fetch user_id from session state
+    else:
+        user_id = None  # Handle guest users or assign a special guest ID
 
-        if st.button("Submit Rating"):
-            # For guest users, use `user_id=None`
-            if not user_id:
-                user_id = None
+    st.write(f"User ID for rating: {user_id}")  # Debug line
 
-            # Check if the guest user or logged-in user has already rated the recipe
-            existing_rating = ratings_collection.find_one({"recipe_id": recipe_id, "user_id": user_id})
-            if existing_rating:
-                ratings_collection.update_one(
-                    {"recipe_id": recipe_id, "user_id": user_id},
-                    {"$set": {"rating": rating}}
-                )
-                st.success("Your rating has been updated.")
-            else:
-                # Generate a new `rating_id` (incremental integer)
-                rating_id = ratings_collection.count_documents({}) + 1
-                ratings_collection.insert_one({
-                    "rating_id": rating_id,
-                    "user_id": user_id,
-                    "recipe_id": recipe_id,
-                    "rating": rating
-                })
-                st.success("Thank you for rating this recipe!")
+    # Get the recipe
+    recipe = recipes_collection.find_one({"recipe_id": recipe_id})
 
-            # Recalculate average rating for the recipe
-            all_ratings = ratings_collection.find({"recipe_id": recipe_id})
-            total_ratings = [r["rating"] for r in all_ratings]
-            avg_rating = sum(total_ratings) / len(total_ratings) if total_ratings else 0
+    # If recipe is not found, handle the error
+    if not recipe:
+        st.error("Recipe not found.")
+        return
+    
+    # Check if the user is logged in
+    user_id = st.session_state.get("logged_in_user", {}).get("user_id")
 
-            # Update the average rating in the Recipes collection
-            recipes_collection.update_one(
-                {"recipe_id": recipe_id},
-                {"$set": {"ratings": round(avg_rating, 1)}}
-            )
+    if not user_id:
+        st.error("You need to log in to rate this recipe.")
+        return
 
-    except Exception as e:
-        st.error(f"An error occurred while rating the recipe: {e}")
+    # Prevent logged-in users from rating their own recipes
+    if user_id == recipe_owner_id:
+        st.info("You cannot rate your own recipe.")
+        return
+
+    # Retrieve the recipe owner's user_id
+    recipe_owner_id = recipe["user_id"]
+
+    # If the logged-in user is the owner of the recipe, don't allow rating
+    if logged_in_user and recipe_owner_id == user_id:
+        st.warning("You cannot rate your own recipe.")
+        return
+
+    # Retrieve the recipe owner's user_id
+    recipe_owner_id = recipe["user_id"]
+
+    # If the logged-in user is the owner of the recipe, don't allow rating
+    if logged_in_user and recipe_owner_id == user_id:
+        st.warning("You cannot rate your own recipe.")
+        return
+
+    # Rating input (always available for guest or non-owner logged-in users)
+    st.write("Rate this recipe:")
+    rating = st.slider("Your Rating", min_value=1, max_value=5, step=1)
+
+    if st.button("Submit Rating"):
+        # Check if the user has already rated
+        existing_rating = ratings_collection.find_one({"recipe_id": recipe_id, "user_id": user_id})
+
+        if existing_rating:
+            # Update existing rating
+            ratings_collection.update_one({"recipe_id": recipe_id, "user_id": user_id}, {"$set": {"rating": rating}})
+            st.success("Your rating has been updated.")
+        else:
+            # Insert a new rating
+            last_rating = ratings_collection.find_one(sort=[("rating_id", -1)])
+            new_rating_id = last_rating["rating_id"] + 1 if last_rating else 1
+            ratings_collection.insert_one({"rating_id": new_rating_id, "user_id": user_id, "recipe_id": recipe_id, "rating": rating})
+            st.success("Thank you for rating this recipe!")
+
+        # Recalculate and update the average rating in the Recipes collection
+        all_ratings = ratings_collection.find({"recipe_id": recipe_id})
+        total_ratings = [r["rating"] for r in all_ratings]
+        avg_rating = sum(total_ratings) / len(total_ratings) if total_ratings else 0
+        recipes_collection.update_one({"recipe_id": recipe_id}, {"$set": {"ratings": round(avg_rating, 1)}})

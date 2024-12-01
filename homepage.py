@@ -200,7 +200,6 @@ def show_homepage():
     if logged_in_username:
         # Fetch the logged-in user's data
         logged_in_user = users_collection.find_one({"username": logged_in_username})
-        favorite_recipe_ids = logged_in_user.get('favorite_recipes', [])
 
     st.title("Welcome to Bitezy!")
 
@@ -279,18 +278,6 @@ def show_homepage():
                     st.rerun()
                 #st.write(f"**Rating:** {rating_display}")
                 
-                # Rating functionality
-                if logged_in_username:
-                    user_rating = st.slider(
-                        f"Rate {row['title']}:",
-                        min_value=1,
-                        max_value=5,
-                        step=1,
-                        key=f"rate_{row['recipe_id']}"
-                    )
-                    if st.button(f"Submit Rating", key=f"submit_rating_{row['recipe_id']}"):
-                        rate_recipe(logged_in_user['_id'], row['recipe_id'], user_rating)
-
                 # Show Favorite/Unfavorite buttons if logged-in user is viewing their homepage
                 if logged_in_username:
                     recipe_id = row['recipe_id']

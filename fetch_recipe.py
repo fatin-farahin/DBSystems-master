@@ -211,6 +211,7 @@ def show_edit_recipe_form(recipe_id):
             image_path = f"uploads/recipes/{uploaded_image.name}"
             with open(image_path, "wb") as f:
                 f.write(uploaded_image.read())
+            st.image(uploaded_image, caption="Uploaded recipe picture", width=300)
         else:
             # If no image is uploaded, show the current image
             if recipe.get("image_src"):
@@ -262,7 +263,7 @@ def show_edit_recipe_form(recipe_id):
                 )
                 st.success("Recipe updated successfully!")
                 st.session_state.selected_recipe = None
-                st.session_state.page = "user_profile"  # Navigate back to profile
+                st.session_state.page = "select_recipe"  # Navigate back to profile
                 st.rerun()
 
         with col2:
@@ -288,13 +289,12 @@ def show_edit_recipe_form(recipe_id):
                     st.session_state.selected_recipe = None  # Reset selected recipe after deletion
                     st.session_state.page = "select_recipe"  # Redirect to recipe selection page
                     st.session_state.confirm_delete = False  # Reset confirmation state
-                    st.rerun()
 
             # Cancel button logic (if you want to cancel the delete operation)
-            """ if st.session_state.confirm_delete and st.button("Cancel", key="cancel_delete_button"):
+            if st.session_state.confirm_delete and st.button("Cancel", key="cancel_delete_button"):
                 st.session_state.confirm_delete = False  # Reset confirm_delete to False
                 st.session_state.page = "select_recipe"  # Go back to the recipe selection page
-                st.rerun() """
+                st.rerun()
 
     else:
         st.error("Recipe not found!")
@@ -325,9 +325,6 @@ def delete_recipe(recipe_id, image_file_name=None):
             image_path = f"uploads/recipes/{image_file_name}"
             if os.path.exists(image_path):
                 os.remove(image_path)
-                st.success(f"Image {image_file_name} deleted successfully.")
-            else:
-                st.warning(f"Image {image_file_name} not found or failed to delete.")
 
 # Fetch all dietary preferences for the dropdown list
 def fetch_all_dietary_preferences():
